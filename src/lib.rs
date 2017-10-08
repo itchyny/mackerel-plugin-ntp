@@ -11,7 +11,7 @@ use std::str::FromStr;
 struct NtpInfo {
     pub when: Interval,
     pub poll: Interval,
-    pub reach: u32,
+    pub reach: Reach,
     pub delay: f64,
     pub offset: f64,
     pub jitter: f64,
@@ -31,6 +31,20 @@ impl FromStr for Interval {
                 .or(s.trim_right_matches('h').parse::<u64>().map(|h| h * 60 * 60))
                 .or(s.trim_right_matches('d').parse::<u64>().map(|d| d * 60 * 60 * 24))
                 .map_err(|_| "failed to parse interval".to_string())?,
+        })
+    }
+}
+
+#[derive(PartialEq, Debug)]
+struct Reach {
+    pub reach: u32,
+}
+
+impl FromStr for Reach {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Reach {
+            reach: s.chars().flat_map(|c| c.to_digit(8).map(|n| n.count_ones())).sum::<u32>(),
         })
     }
 }
@@ -60,11 +74,7 @@ fn parse_ntp_line(line: String) -> Result<NtpInfo, String> {
     Ok(NtpInfo {
         when: parts.get(4).and_then(|x| x.parse().ok()).ok_or("failed to find when from ntpq -pn")?,
         poll: parts.get(5).and_then(|x| x.parse().ok()).ok_or("failed to find poll from ntpq -pn")?,
-        reach: parts
-            .get(6)
-            .and_then(|x| x.parse().ok())
-            .map(|x: u32| x.count_ones())
-            .ok_or("failed to find reach from ntpq -pn")?,
+        reach: parts.get(6).and_then(|x| x.parse().ok()).ok_or("failed to find reach from ntpq -pn")?,
         delay: parts.get(7).and_then(|x| x.parse().ok()).ok_or("failed to find delay from ntpq -pn")?,
         offset: parts.get(8).and_then(|x| x.parse().ok()).ok_or("failed to find offset from ntpq -pn")?,
         jitter: parts.get(9).and_then(|x| x.parse().ok()).ok_or("failed to find jitter from ntpq -pn")?,
@@ -83,18 +93,18 @@ mod test {
                 NtpInfo {
                     when: Interval { interval: 2100 },
                     poll: Interval { interval: 512 },
-                    reach: 1,
+                    reach: Reach { reach: 3 },
                     delay: 51.191,
                     offset: 831.748,
                     jitter: 8.311,
                 },
             ),
             (
-                " 2001:4860:4806: .GOOG.           1 u   29   64    1   86.892   -6.196   0.001",
+                " 2001:4860:4806: .GOOG.           1 u   29   64   377  86.892   -6.196   0.001",
                 NtpInfo {
                     when: Interval { interval: 29 },
                     poll: Interval { interval: 64 },
-                    reach: 1,
+                    reach: Reach { reach: 8 },
                     delay: 86.892,
                     offset: -6.196,
                     jitter: 0.001,
@@ -115,7 +125,7 @@ impl Plugin for NtpPlugin {
         let info = get_ntp_info()?;
         metrics.insert("poll.poll".to_string(), info.poll.interval as f64);
         metrics.insert("poll.when".to_string(), info.when.interval as f64);
-        metrics.insert("reach.reach".to_string(), info.reach as f64);
+        metrics.insert("reach.reach".to_string(), info.reach.reach as f64);
         metrics.insert("delay.delay".to_string(), info.delay);
         metrics.insert("offset.offset".to_string(), info.offset.abs());
         metrics.insert("jitter.jitter".to_string(), info.jitter);
