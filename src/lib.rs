@@ -26,14 +26,17 @@ fn get_ntp_info() -> Result<NtpInfo, String> {
         .filter_map(|line_opt| line_opt.ok())
         .skip(2)
         .collect();
-    let parts: Vec<_> = lines
+    let line = lines
         .iter()
         .filter(|line| line.starts_with("*"))
         .next()
         .or(lines.first())
-        .ok_or("failed to find ntp information".to_string())?
-        .split_whitespace()
-        .collect();
+        .ok_or("failed to find ntp information".to_string())?;
+    parse_ntp_line(line.clone())
+}
+
+fn parse_ntp_line(line: String) -> Result<NtpInfo, String> {
+    let parts: Vec<_> = line.split_whitespace().collect();
     Ok(NtpInfo {
         when: parts.get(4).and_then(|x| x.parse().ok()).ok_or("failed to find when from ntpq -pn")?,
         poll: parts.get(5).and_then(|x| x.parse().ok()).ok_or("failed to find poll from ntpq -pn")?,
