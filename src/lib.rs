@@ -21,14 +21,19 @@ fn get_ntp_info() -> Result<NtpInfo, String> {
         .stdout(Stdio::piped())
         .spawn()
         .map_err(|e| format!("failed to execute ntpq: {}", e))?;
-    let stdout = child.stdout.ok_or("faild to read stdout of ntpq".to_string())?;
-    let line = BufReader::new(stdout)
+    let lines: Vec<_> = BufReader::new(child.stdout.ok_or("faild to read stdout of ntpq".to_string())?)
         .lines()
         .filter_map(|line_opt| line_opt.ok())
+        .skip(2)
+        .collect();
+    let parts: Vec<_> = lines
+        .iter()
         .filter(|line| line.starts_with("*"))
         .next()
-        .ok_or("failed to find ntp information in sync".to_string())?;
-    let parts: Vec<_> = line.split_whitespace().collect();
+        .or(lines.first())
+        .ok_or("failed to find ntp information".to_string())?
+        .split_whitespace()
+        .collect();
     Ok(NtpInfo {
         when: parts.get(4).and_then(|x| x.parse().ok()).ok_or("failed to find when from ntpq -pn")?,
         poll: parts.get(5).and_then(|x| x.parse().ok()).ok_or("failed to find poll from ntpq -pn")?,
