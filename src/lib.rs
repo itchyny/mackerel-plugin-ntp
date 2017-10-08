@@ -44,7 +44,7 @@ impl FromStr for Reach {
     type Err = String;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(Reach {
-            reach: s.chars().flat_map(|c| c.to_digit(8).map(|n| n.count_ones())).sum::<u32>(),
+            reach: s.chars().flat_map(|c| c.to_digit(8).map(|n| n.count_ones())).sum(),
         })
     }
 }
@@ -69,15 +69,23 @@ fn get_ntp_info() -> Result<NtpInfo, String> {
     parse_ntp_line(line.clone())
 }
 
+macro_rules! parse_index {
+    ($parts:expr, $index:expr, $field:expr) => {
+        $parts.get($index)
+            .and_then(|x| x.parse().ok())
+            .ok_or(format!("failed to parse {} from ntpq -pn", $field))
+    }
+}
+
 fn parse_ntp_line(line: String) -> Result<NtpInfo, String> {
     let parts: Vec<_> = line.split_whitespace().collect();
     Ok(NtpInfo {
-        when: parts.get(4).and_then(|x| x.parse().ok()).ok_or("failed to find when from ntpq -pn")?,
-        poll: parts.get(5).and_then(|x| x.parse().ok()).ok_or("failed to find poll from ntpq -pn")?,
-        reach: parts.get(6).and_then(|x| x.parse().ok()).ok_or("failed to find reach from ntpq -pn")?,
-        delay: parts.get(7).and_then(|x| x.parse().ok()).ok_or("failed to find delay from ntpq -pn")?,
-        offset: parts.get(8).and_then(|x| x.parse().ok()).ok_or("failed to find offset from ntpq -pn")?,
-        jitter: parts.get(9).and_then(|x| x.parse().ok()).ok_or("failed to find jitter from ntpq -pn")?,
+        when: parse_index!(parts, 4, "when")?,
+        poll: parse_index!(parts, 5, "poll")?,
+        reach: parse_index!(parts, 6, "reach")?,
+        delay: parse_index!(parts, 7, "delay")?,
+        offset: parse_index!(parts, 8, "offset")?,
+        jitter: parse_index!(parts, 9, "jitter")?,
     })
 }
 
