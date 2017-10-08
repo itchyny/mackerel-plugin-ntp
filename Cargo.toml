@@ -1,0 +1,16 @@
+[package]
+name = "mackerel_plugin_ntp"
+version = "0.0.0"
+authors = ["itchyny <itchyny@hatena.ne.jp>"]
+description = "ntp plugin for Mackerel"
+repository = "https://github.com/itchyny/mackerel-plugin-ntp"
+readme = "README.md"
+license = "MIT"
+keywords = ["cli", "mackerel"]
+
+[dependencies]
+mackerel_plugin = "0.2"
+
+[[bin]]
+name = "mackerel-plugin-ntp"
+path = "bin/main.rs"
