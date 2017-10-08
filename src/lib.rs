@@ -5,14 +5,34 @@ use mackerel_plugin::*;
 use std::collections::HashMap;
 use std::process::{Command, Stdio};
 use std::io::{BufRead, BufReader};
+use std::str::FromStr;
 
+#[derive(PartialEq, Debug)]
 struct NtpInfo {
-    pub when: f64,
-    pub poll: f64,
+    pub when: Interval,
+    pub poll: Interval,
     pub reach: u32,
     pub delay: f64,
     pub offset: f64,
     pub jitter: f64,
+}
+
+#[derive(PartialEq, Debug)]
+struct Interval {
+    pub interval: u64,
+}
+
+impl FromStr for Interval {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Interval {
+            interval: s.parse()
+                .or(s.trim_right_matches('m').parse::<u64>().map(|m| m * 60))
+                .or(s.trim_right_matches('h').parse::<u64>().map(|h| h * 60 * 60))
+                .or(s.trim_right_matches('d').parse::<u64>().map(|d| d * 60 * 60 * 24))
+                .map_err(|_| "failed to parse interval".to_string())?,
+        })
+    }
 }
 
 fn get_ntp_info() -> Result<NtpInfo, String> {
@@ -51,14 +71,50 @@ fn parse_ntp_line(line: String) -> Result<NtpInfo, String> {
     })
 }
 
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_parse_ntp_line() {
+        let tests = vec![
+            (
+                " 17.253.68.253   .GPSs.           1 u  35m  512   16   51.191  831.748   8.311",
+                NtpInfo {
+                    when: Interval { interval: 2100 },
+                    poll: Interval { interval: 512 },
+                    reach: 1,
+                    delay: 51.191,
+                    offset: 831.748,
+                    jitter: 8.311,
+                },
+            ),
+            (
+                " 2001:4860:4806: .GOOG.           1 u   29   64    1   86.892   -6.196   0.001",
+                NtpInfo {
+                    when: Interval { interval: 29 },
+                    poll: Interval { interval: 64 },
+                    reach: 1,
+                    delay: 86.892,
+                    offset: -6.196,
+                    jitter: 0.001,
+                },
+            ),
+        ];
+        for (src, expected) in tests {
+            assert_eq!(parse_ntp_line(src.to_string()), Ok(expected));
+        }
+    }
+}
+
 pub struct NtpPlugin {}
 
 impl Plugin for NtpPlugin {
     fn fetch_metrics(&self) -> Result<HashMap<String, f64>, String> {
         let mut metrics = HashMap::new();
         let info = get_ntp_info()?;
-        metrics.insert("poll.poll".to_string(), info.poll);
-        metrics.insert("poll.when".to_string(), info.when);
+        metrics.insert("poll.poll".to_string(), info.poll.interval as f64);
+        metrics.insert("poll.when".to_string(), info.when.interval as f64);
         metrics.insert("reach.reach".to_string(), info.reach as f64);
         metrics.insert("delay.delay".to_string(), info.delay);
         metrics.insert("offset.offset".to_string(), info.offset.abs());
