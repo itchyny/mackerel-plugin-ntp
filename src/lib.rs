@@ -9,6 +9,7 @@ use std::io::{BufRead, BufReader};
 struct NtpInfo {
     pub when: f64,
     pub poll: f64,
+    pub reach: u32,
     pub delay: f64,
     pub offset: f64,
     pub jitter: f64,
@@ -31,6 +32,11 @@ fn get_ntp_info() -> Result<NtpInfo, String> {
     Ok(NtpInfo {
         when: parts.get(4).and_then(|x| x.parse().ok()).ok_or("failed to find when from ntpq -pn")?,
         poll: parts.get(5).and_then(|x| x.parse().ok()).ok_or("failed to find poll from ntpq -pn")?,
+        reach: parts
+            .get(6)
+            .and_then(|x| x.parse().ok())
+            .map(|x: u32| x.count_ones())
+            .ok_or("failed to find reach from ntpq -pn")?,
         delay: parts.get(7).and_then(|x| x.parse().ok()).ok_or("failed to find delay from ntpq -pn")?,
         offset: parts.get(8).and_then(|x| x.parse().ok()).ok_or("failed to find offset from ntpq -pn")?,
         jitter: parts.get(9).and_then(|x| x.parse().ok()).ok_or("failed to find jitter from ntpq -pn")?,
@@ -45,6 +51,7 @@ impl Plugin for NtpPlugin {
         let info = get_ntp_info()?;
         metrics.insert("poll.poll".to_string(), info.poll);
         metrics.insert("poll.when".to_string(), info.when);
+        metrics.insert("reach.reach".to_string(), info.reach as f64);
         metrics.insert("delay.delay".to_string(), info.delay);
         metrics.insert("offset.offset".to_string(), info.offset.abs());
         metrics.insert("jitter.jitter".to_string(), info.jitter);
@@ -60,6 +67,14 @@ impl Plugin for NtpPlugin {
                 metrics: [
                     { name: "poll", label: "poll (sec)" },
                     { name: "when", label: "when (sec)" },
+                ]
+            },
+            graph! {
+                name: "reach",
+                label: "NTP reach",
+                unit: "integer",
+                metrics: [
+                    { name: "reach", label: "reach" },
                 ]
             },
             graph! {
