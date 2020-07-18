@@ -9,7 +9,7 @@ license = "MIT"
 keywords = ["cli", "mackerel"]
 
 [dependencies]
-mackerel_plugin = "0.2"
+mackerel_plugin = "0.2.4"
 
 [[bin]]
 name = "mackerel-plugin-ntp"
