@@ -1,4 +1,3 @@
-#[macro_use]
 extern crate mackerel_plugin;
 
 use mackerel_plugin::*;
@@ -27,9 +26,9 @@ impl FromStr for Interval {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(Interval {
             interval: s.parse()
-                .or(s.trim_right_matches('m').parse::<u64>().map(|m| m * 60))
-                .or(s.trim_right_matches('h').parse::<u64>().map(|h| h * 60 * 60))
-                .or(s.trim_right_matches('d').parse::<u64>().map(|d| d * 60 * 60 * 24))
+                .or(s.trim_end_matches('m').parse::<u64>().map(|m| m * 60))
+                .or(s.trim_end_matches('h').parse::<u64>().map(|h| h * 60 * 60))
+                .or(s.trim_end_matches('d').parse::<u64>().map(|d| d * 60 * 60 * 24))
                 .map_err(|_| "failed to parse interval".to_string())?,
         })
     }
