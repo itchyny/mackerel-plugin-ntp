@@ -2,8 +2,8 @@ extern crate mackerel_plugin;
 
 use mackerel_plugin::*;
 use std::collections::HashMap;
-use std::process::{Command, Stdio};
 use std::io::{BufRead, BufReader};
+use std::process::{Command, Stdio};
 use std::str::FromStr;
 
 #[derive(PartialEq, Debug)]
@@ -25,10 +25,14 @@ impl FromStr for Interval {
     type Err = String;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(Interval {
-            interval: s.parse()
+            interval: s
+                .parse()
                 .or(s.trim_end_matches('m').parse::<u64>().map(|m| m * 60))
                 .or(s.trim_end_matches('h').parse::<u64>().map(|h| h * 60 * 60))
-                .or(s.trim_end_matches('d').parse::<u64>().map(|d| d * 60 * 60 * 24))
+                .or(s
+                    .trim_end_matches('d')
+                    .parse::<u64>()
+                    .map(|d| d * 60 * 60 * 24))
                 .map_err(|_| "failed to parse interval".to_string())?,
         })
     }
@@ -43,7 +47,10 @@ impl FromStr for Reach {
     type Err = String;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(Reach {
-            reach: s.chars().flat_map(|c| c.to_digit(8).map(|n| n.count_ones())).sum(),
+            reach: s
+                .chars()
+                .flat_map(|c| c.to_digit(8).map(|n| n.count_ones()))
+                .sum(),
         })
     }
 }
@@ -54,11 +61,15 @@ fn get_ntp_info() -> Result<NtpInfo, String> {
         .stdout(Stdio::piped())
         .spawn()
         .map_err(|e| format!("failed to execute ntpq: {}", e))?;
-    let lines: Vec<_> = BufReader::new(child.stdout.ok_or("faild to read stdout of ntpq".to_string())?)
-        .lines()
-        .filter_map(|line_opt| line_opt.ok())
-        .skip(2)
-        .collect();
+    let lines: Vec<_> = BufReader::new(
+        child
+            .stdout
+            .ok_or("faild to read stdout of ntpq".to_string())?,
+    )
+    .lines()
+    .filter_map(|line_opt| line_opt.ok())
+    .skip(2)
+    .collect();
     let line = lines
         .iter()
         .filter(|line| line.starts_with("*"))
@@ -68,15 +79,15 @@ fn get_ntp_info() -> Result<NtpInfo, String> {
     parse_ntp_line(line.clone())
 }
 
-macro_rules! parse_index {
-    ($parts:expr, $index:expr, $field:expr) => {
-        $parts.get($index)
-            .and_then(|x| x.parse().ok())
-            .ok_or(format!("failed to parse {} from ntpq -pn", $field))
-    }
-}
-
 fn parse_ntp_line(line: String) -> Result<NtpInfo, String> {
+    macro_rules! parse_index {
+        ($parts:expr, $index:expr, $field:expr) => {
+            $parts
+                .get($index)
+                .and_then(|x| x.parse().ok())
+                .ok_or(format!("failed to parse {} from ntpq -pn", $field))
+        };
+    }
     let parts: Vec<_> = line.split_whitespace().collect();
     Ok(NtpInfo {
         when: parse_index!(parts, 4, "when")?,
